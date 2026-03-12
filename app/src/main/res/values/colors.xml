@@ -2,4 +2,46 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Map Colors -->
+    <!-- Space Map -->
+    <color name="space_background">#1a1a2e</color>
+    <color name="space_star">#FFFFFF</color>
+
+    <!-- Sunset Map -->
+    <color name="sunset_background_top">#1a0533</color>
+    <color name="sunset_background_mid">#4a1942</color>
+    <color name="sunset_background_bottom">#ff6b35</color>
+    <color name="sunset_sun">#ff9f1c</color>
+
+    <!-- Aurora Map -->
+    <color name="aurora_background">#0a1628</color>
+    <color name="aurora_green">#00ff87</color>
+    <color name="aurora_blue">#00d4ff</color>
+    <color name="aurora_purple">#bf00ff</color>
+
+    <!-- UI Colors -->
+    <color name="menu_background">#0d0d1a</color>
+    <color name="menu_button">#2a2a4a</color>
+    <color name="menu_button_pressed">#3a3a6a</color>
+    <color name="menu_title">#00d4ff</color>
+    <color name="menu_button_text">#FFFFFF</color>
+    <color name="menu_selected">#ffd700</color>
+
+    <!-- Game Colors -->
+    <color name="player_color">#00d4ff</color>
+    <color name="player_cockpit">#ffffff</color>
+    <color name="enemy_color">#ff4444</color>
+    <color name="enemy_wing">#cc0000</color>
+    <color name="bullet_color">#ffeb3b</color>
+    <color name="shield_color">#00ffff</color>
+    <color name="double_shot_color">#ff00ff</color>
+    <color name="speed_boost_color">#00ff00</color>
+    <color name="slow_motion_color">#ffa500</color>
+
+    <!-- Text Colors -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#AAAAAA</color>
+    <color name="text_gold">#ffd700</color>
+    <color name="text_red">#ff4444</color>
 </resources>
