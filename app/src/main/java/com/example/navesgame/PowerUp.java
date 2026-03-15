@@ -1,5 +1,6 @@
 package com.example.navesgame;
 
+import android.graphics.Bitmap;
 import android.graphics.Color;
 
 import java.util.Random;
@@ -11,12 +12,16 @@ public class PowerUp {
     public static final int TYPE_DOUBLE_SHOT = 1;
     public static final int TYPE_SPEED_BOOST = 2;
     public static final int TYPE_SLOW_MOTION = 3;
+    public static final int TYPE_TRIPLE_SHOT = 4;
+    public static final int TYPE_HEALTH = 5;
+    public static final int TYPE_BOMB = 6;
 
     // Duration in milliseconds
     public static final long DURATION_SHIELD = 10000; // 10 seconds
     public static final long DURATION_DOUBLE_SHOT = 8000; // 8 seconds
     public static final long DURATION_SPEED_BOOST = 10000; // 10 seconds
     public static final long DURATION_SLOW_MOTION = 5000; // 5 seconds
+    public static final long DURATION_TRIPLE_SHOT = 6000; // 6 seconds
 
     // Size
     public static final int POWER_UP_SIZE = 40;
@@ -25,13 +30,14 @@ public class PowerUp {
     private int y;
     private int type;
     private int speed = 3;
-    private boolean active = true;
+    private Bitmap bitmap; // Added bitmap field
     private Random random = new Random();
 
-    public PowerUp(int screenWidth, int screenHeight, int minY) {
+    public PowerUp(int screenWidth, int screenHeight, Bitmap bitmap, int type) {
+        this.bitmap = bitmap;
+        this.type = type;
         this.x = random.nextInt(screenWidth - POWER_UP_SIZE);
-        this.y = random.nextInt(screenHeight / 3) + minY;
-        this.type = random.nextInt(4);
+        this.y = -POWER_UP_SIZE; // Spawn above the screen
     }
 
     public void update() {
@@ -58,66 +64,8 @@ public class PowerUp {
         return POWER_UP_SIZE;
     }
 
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
-    }
-
-    /**
-     * Returns the color for this power-up type
-     */
-    public int getColor() {
-        switch (type) {
-            case TYPE_SHIELD:
-                return Color.parseColor("#00FFFF"); // Cyan
-            case TYPE_DOUBLE_SHOT:
-                return Color.parseColor("#FF00FF"); // Magenta
-            case TYPE_SPEED_BOOST:
-                return Color.parseColor("#00FF00"); // Green
-            case TYPE_SLOW_MOTION:
-                return Color.parseColor("#FFA500"); // Orange
-            default:
-                return Color.WHITE;
-        }
-    }
-
-    /**
-     * Returns the icon/letter for this power-up type
-     */
-    public String getIcon() {
-        switch (type) {
-            case TYPE_SHIELD:
-                return "S";
-            case TYPE_DOUBLE_SHOT:
-                return "D";
-            case TYPE_SPEED_BOOST:
-                return "V";
-            case TYPE_SLOW_MOTION:
-                return "T";
-            default:
-                return "?";
-        }
-    }
-
-    /**
-     * Returns the name of this power-up type
-     */
-    public String getName() {
-        switch (type) {
-            case TYPE_SHIELD:
-                return "Escudo";
-            case TYPE_DOUBLE_SHOT:
-                return "Doble Disparo";
-            case TYPE_SPEED_BOOST:
-                return "Velocidad+";
-            case TYPE_SLOW_MOTION:
-                return "Slow Motion";
-            default:
-                return "Unknown";
-        }
+    public Bitmap getBitmap() {
+        return bitmap;
     }
 
     /**
@@ -125,16 +73,12 @@ public class PowerUp {
      */
     public long getDuration() {
         switch (type) {
-            case TYPE_SHIELD:
-                return DURATION_SHIELD;
-            case TYPE_DOUBLE_SHOT:
-                return DURATION_DOUBLE_SHOT;
-            case TYPE_SPEED_BOOST:
-                return DURATION_SPEED_BOOST;
-            case TYPE_SLOW_MOTION:
-                return DURATION_SLOW_MOTION;
-            default:
-                return 5000;
+            case TYPE_SHIELD: return DURATION_SHIELD;
+            case TYPE_DOUBLE_SHOT: return DURATION_DOUBLE_SHOT;
+            case TYPE_SPEED_BOOST: return DURATION_SPEED_BOOST;
+            case TYPE_SLOW_MOTION: return DURATION_SLOW_MOTION;
+            case TYPE_TRIPLE_SHOT: return DURATION_TRIPLE_SHOT;
+            default: return 5000;
         }
     }
 
@@ -143,18 +87,13 @@ public class PowerUp {
      */
     public void applyEffect(GameState gameState) {
         switch (type) {
-            case TYPE_SHIELD:
-                gameState.activateShield(DURATION_SHIELD);
-                break;
-            case TYPE_DOUBLE_SHOT:
-                gameState.activateDoubleShot(DURATION_DOUBLE_SHOT);
-                break;
-            case TYPE_SPEED_BOOST:
-                gameState.activateSpeedBoost(DURATION_SPEED_BOOST);
-                break;
-            case TYPE_SLOW_MOTION:
-                gameState.activateSlowMotion(DURATION_SLOW_MOTION);
-                break;
+            case TYPE_SHIELD: gameState.activateShield(DURATION_SHIELD); break;
+            case TYPE_DOUBLE_SHOT: gameState.activateDoubleShot(DURATION_DOUBLE_SHOT); break;
+            case TYPE_SPEED_BOOST: gameState.activateSpeedBoost(DURATION_SPEED_BOOST); break;
+            case TYPE_SLOW_MOTION: gameState.activateSlowMotion(DURATION_SLOW_MOTION); break;
+            case TYPE_TRIPLE_SHOT: gameState.activateTripleShot(DURATION_TRIPLE_SHOT); break;
+            case TYPE_HEALTH: gameState.addHealth(); break;
+            case TYPE_BOMB: /* Handled in GameView */ break;
         }
     }
 }

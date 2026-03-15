@@ -1,5 +1,8 @@
 package com.example.navesgame;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+
 /**
  * GameState manages the current state of the game including
  * selected map, level, score, and other game settings.
@@ -31,6 +34,12 @@ public class GameState {
     private int selectedMap = MAP_SPACE;
     private int selectedLevel = LEVEL_ARCADE;
 
+    // Player Stats
+    private int playerHealth = 3;
+    private int maxPlayerHealth = 3;
+    private boolean isBossActive = false;
+    private int nextBossScore = 500;
+
     // Score
     private int currentScore = 0;
     private int highScore = 0;
@@ -43,16 +52,23 @@ public class GameState {
     // Power-up states
     private boolean hasShield = false;
     private boolean hasDoubleShot = false;
+    private boolean hasTripleShot = false;
     private boolean hasSpeedBoost = false;
     private boolean hasSlowMotion = false;
 
     // Power-up timers
     private long shieldEndTime = 0;
     private long doubleShotEndTime = 0;
+    private long tripleShotEndTime = 0;
     private long speedBoostEndTime = 0;
     private long slowMotionEndTime = 0;
 
-    public GameState() {
+    private Context context; // Added for SharedPreferences
+    private static final String PREFS_NAME = "NavesGamePrefs"; // Added for SharedPreferences
+    private static final String HIGH_SCORE_KEY = "highScore"; // Added for SharedPreferences
+
+    public GameState(Context context) { // Modified constructor
+        this.context = context;
         loadHighScore();
     }
 
@@ -82,34 +98,42 @@ public class GameState {
     }
 
     private void applyLevelSettings() {
+        playerHealth = 3;
+        isBossActive = false;
+        nextBossScore = 500;
         switch (selectedLevel) {
             case LEVEL_1:
-                // Easy - slow enemies, slow spawn
                 enemySpeed = 4;
                 enemySpawnDelay = 2000;
                 maxEnemies = 5;
                 break;
             case LEVEL_2:
-                // Medium - faster enemies
                 enemySpeed = 7;
                 enemySpawnDelay = 1500;
                 maxEnemies = 8;
                 break;
             case LEVEL_3:
-                // Hard - fast enemies, fast spawn
                 enemySpeed = 10;
                 enemySpawnDelay = 1000;
                 maxEnemies = 12;
                 break;
             case LEVEL_ARCADE:
             default:
-                // Arcade starts easy and gets harder
                 enemySpeed = 5;
                 enemySpawnDelay = 1500;
                 maxEnemies = 10;
                 break;
         }
     }
+
+    public int getPlayerHealth() { return playerHealth; }
+    public void takeDamage() { if (!hasShield) playerHealth--; }
+    public void addHealth() { if (playerHealth < maxPlayerHealth) playerHealth++; }
+    public boolean isDead() { return playerHealth <= 0; }
+    public boolean isBossActive() { return isBossActive; }
+    public void setBossActive(boolean active) { this.isBossActive = active; }
+    public int getNextBossScore() { return nextBossScore; }
+    public void advanceBossScore() { nextBossScore += 500; }
 
     public int getEnemySpeed() {
         return enemySpeed;
@@ -159,13 +183,13 @@ public class GameState {
     }
 
     private void loadHighScore() {
-        // Load from SharedPreferences in actual implementation
-        // For now, use a default value
-        highScore = 0;
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        highScore = prefs.getInt(HIGH_SCORE_KEY, 0);
     }
 
     private void saveHighScore() {
-        // Save to SharedPreferences in actual implementation
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        prefs.edit().putInt(HIGH_SCORE_KEY, highScore).apply();
     }
 
     // Power-up methods
@@ -176,7 +200,14 @@ public class GameState {
 
     public void activateDoubleShot(long duration) {
         hasDoubleShot = true;
+        hasTripleShot = false;
         doubleShotEndTime = System.currentTimeMillis() + duration;
+    }
+
+    public void activateTripleShot(long duration) {
+        hasTripleShot = true;
+        hasDoubleShot = false;
+        tripleShotEndTime = System.currentTimeMillis() + duration;
     }
 
     public void activateSpeedBoost(long duration) {
@@ -198,6 +229,9 @@ public class GameState {
         if (hasDoubleShot && currentTime > doubleShotEndTime) {
             hasDoubleShot = false;
         }
+        if (hasTripleShot && currentTime > tripleShotEndTime) {
+            hasTripleShot = false;
+        }
         if (hasSpeedBoost && currentTime > speedBoostEndTime) {
             hasSpeedBoost = false;
         }
@@ -214,6 +248,10 @@ public class GameState {
         return hasDoubleShot && System.currentTimeMillis() <= doubleShotEndTime;
     }
 
+    public boolean hasTripleShot() {
+        return hasTripleShot && System.currentTimeMillis() <= tripleShotEndTime;
+    }
+
     public boolean hasSpeedBoost() {
         return hasSpeedBoost && System.currentTimeMillis() <= speedBoostEndTime;
     }
@@ -228,10 +266,14 @@ public class GameState {
 
     public void resetForNewGame() {
         currentScore = 0;
+        playerHealth = 3;
         hasShield = false;
         hasDoubleShot = false;
+        hasTripleShot = false;
         hasSpeedBoost = false;
         hasSlowMotion = false;
+        isBossActive = false;
+        nextBossScore = 500;
         applyLevelSettings();
     }
 
