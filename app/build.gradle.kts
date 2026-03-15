@@ -4,12 +4,12 @@ plugins {
 
 android {
     namespace = "com.example.navesgame"
-    compileSdk = 36
-
+    compileSdk = 35
+ 
     defaultConfig {
         applicationId = "com.example.navesgame"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -26,8 +26,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
