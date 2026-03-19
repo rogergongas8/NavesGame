@@ -1,263 +1,106 @@
 package com.example.navesgame;
 
-/**
- * GameState manages the current state of the game including
- * selected map, level, score, and other game settings.
- */
 public class GameState {
-
-    // Game states
     public static final int STATE_MENU = 0;
-    public static final int STATE_MAP_SELECT = 1;
-    public static final int STATE_LEVEL_SELECT = 2;
-    public static final int STATE_HIGH_SCORES = 3;
     public static final int STATE_PLAYING = 4;
     public static final int STATE_GAME_OVER = 5;
-    public static final int STATE_SETTINGS = 6;
 
-    // Map types
     public static final int MAP_SPACE = 0;
     public static final int MAP_SUNSET = 1;
     public static final int MAP_AURORA = 2;
 
-    // Level types
     public static final int LEVEL_ARCADE = 0;
-    public static final int LEVEL_1 = 1;
-    public static final int LEVEL_2 = 2;
-    public static final int LEVEL_3 = 3;
 
-    // Current state
     private int currentState = STATE_MENU;
     private int selectedMap = MAP_SPACE;
-    private int selectedLevel = LEVEL_ARCADE;
-
-    // Score
     private int currentScore = 0;
     private int highScore = 0;
 
-    // Difficulty settings per level
-    private int enemySpeed = 5;
-    private long enemySpawnDelay = 1500;
-    private int maxEnemies = 10;
-
-    // Power-up states
+    // Power-ups
     private boolean hasShield = false;
     private boolean hasDoubleShot = false;
+    private boolean hasTripleShot = false;
     private boolean hasSpeedBoost = false;
     private boolean hasSlowMotion = false;
 
-    // Power-up timers
     private long shieldEndTime = 0;
     private long doubleShotEndTime = 0;
+    private long tripleShotEndTime = 0;
     private long speedBoostEndTime = 0;
     private long slowMotionEndTime = 0;
 
-    public GameState() {
-        loadHighScore();
+    // Boss status
+    private boolean bossActive = false;
+    private int lastBossScore = 0;
+
+    public void setState(int state) { this.currentState = state; }
+    public int getState() { return currentState; }
+    public void setMap(int map) { this.selectedMap = map; }
+    public int getMap() { return selectedMap; }
+    public int getLevel() { return LEVEL_ARCADE; }
+
+    public int getScore() { return currentScore; }
+    public void addScore(int points) { 
+        this.currentScore += points; 
+        updateProgression();
+    }
+    
+    private void updateProgression() {
+        // Cambio automático de mapa según puntuación
+        if (currentScore >= 2000) setMap(MAP_AURORA);
+        else if (currentScore >= 1000) setMap(MAP_SUNSET);
+        else setMap(MAP_SPACE);
     }
 
-    public void setState(int state) {
-        this.currentState = state;
-    }
+    public void setHighScore(int score) { this.highScore = score; }
+    public int getHighScore() { return highScore; }
+    public void updateHighScore() { if (currentScore > highScore) highScore = currentScore; }
 
-    public int getState() {
-        return currentState;
-    }
-
-    public void setMap(int map) {
-        this.selectedMap = map;
-    }
-
-    public int getMap() {
-        return selectedMap;
-    }
-
-    public void setLevel(int level) {
-        this.selectedLevel = level;
-        applyLevelSettings();
-    }
-
-    public int getLevel() {
-        return selectedLevel;
-    }
-
-    private void applyLevelSettings() {
-        switch (selectedLevel) {
-            case LEVEL_1:
-                // Easy - slow enemies, slow spawn
-                enemySpeed = 4;
-                enemySpawnDelay = 2000;
-                maxEnemies = 5;
-                break;
-            case LEVEL_2:
-                // Medium - faster enemies
-                enemySpeed = 7;
-                enemySpawnDelay = 1500;
-                maxEnemies = 8;
-                break;
-            case LEVEL_3:
-                // Hard - fast enemies, fast spawn
-                enemySpeed = 10;
-                enemySpawnDelay = 1000;
-                maxEnemies = 12;
-                break;
-            case LEVEL_ARCADE:
-            default:
-                // Arcade starts easy and gets harder
-                enemySpeed = 5;
-                enemySpawnDelay = 1500;
-                maxEnemies = 10;
-                break;
-        }
-    }
-
-    public int getEnemySpeed() {
-        return enemySpeed;
-    }
-
-    public void setEnemySpeed(int speed) {
-        this.enemySpeed = speed;
-    }
-
-    public long getEnemySpawnDelay() {
-        return enemySpawnDelay;
-    }
-
-    public void setEnemySpawnDelay(long delay) {
-        this.enemySpawnDelay = delay;
-    }
-
-    public int getMaxEnemies() {
-        return maxEnemies;
-    }
-
-    public void setScore(int score) {
-        this.currentScore = score;
-    }
-
-    public int getScore() {
-        return currentScore;
-    }
-
-    public void addScore(int points) {
-        this.currentScore += points;
-    }
-
-    public void setHighScore(int score) {
-        this.highScore = score;
-    }
-
-    public int getHighScore() {
-        return highScore;
-    }
-
-    public void updateHighScore() {
-        if (currentScore > highScore) {
-            highScore = currentScore;
-            saveHighScore();
-        }
-    }
-
-    private void loadHighScore() {
-        // Load from SharedPreferences in actual implementation
-        // For now, use a default value
-        highScore = 0;
-    }
-
-    private void saveHighScore() {
-        // Save to SharedPreferences in actual implementation
-    }
-
-    // Power-up methods
-    public void activateShield(long duration) {
-        hasShield = true;
-        shieldEndTime = System.currentTimeMillis() + duration;
-    }
-
-    public void activateDoubleShot(long duration) {
-        hasDoubleShot = true;
-        doubleShotEndTime = System.currentTimeMillis() + duration;
-    }
-
-    public void activateSpeedBoost(long duration) {
-        hasSpeedBoost = true;
-        speedBoostEndTime = System.currentTimeMillis() + duration;
-    }
-
-    public void activateSlowMotion(long duration) {
-        hasSlowMotion = true;
-        slowMotionEndTime = System.currentTimeMillis() + duration;
-    }
+    public void activateShield(long duration) { hasShield = true; shieldEndTime = System.currentTimeMillis() + duration; }
+    public void activateDoubleShot(long duration) { hasDoubleShot = true; hasTripleShot = false; doubleShotEndTime = System.currentTimeMillis() + duration; }
+    public void activateTripleShot(long duration) { hasTripleShot = true; hasDoubleShot = false; tripleShotEndTime = System.currentTimeMillis() + duration; }
+    public void activateSpeedBoost(long duration) { hasSpeedBoost = true; speedBoostEndTime = System.currentTimeMillis() + duration; }
+    public void activateSlowMotion(long duration) { hasSlowMotion = true; slowMotionEndTime = System.currentTimeMillis() + duration; }
 
     public void updatePowerUps() {
-        long currentTime = System.currentTimeMillis();
-
-        if (hasShield && currentTime > shieldEndTime) {
-            hasShield = false;
-        }
-        if (hasDoubleShot && currentTime > doubleShotEndTime) {
-            hasDoubleShot = false;
-        }
-        if (hasSpeedBoost && currentTime > speedBoostEndTime) {
-            hasSpeedBoost = false;
-        }
-        if (hasSlowMotion && currentTime > slowMotionEndTime) {
-            hasSlowMotion = false;
-        }
+        long now = System.currentTimeMillis();
+        if (hasShield && now > shieldEndTime) hasShield = false;
+        if (hasDoubleShot && now > doubleShotEndTime) hasDoubleShot = false;
+        if (hasTripleShot && now > tripleShotEndTime) hasTripleShot = false;
+        if (hasSpeedBoost && now > speedBoostEndTime) hasSpeedBoost = false;
+        if (hasSlowMotion && now > slowMotionEndTime) hasSlowMotion = false;
     }
 
-    public boolean hasShield() {
-        return hasShield && System.currentTimeMillis() <= shieldEndTime;
+    public boolean hasShield() { return hasShield; }
+    public boolean hasDoubleShot() { return hasDoubleShot; }
+    public boolean hasTripleShot() { return hasTripleShot; }
+    public boolean hasSpeedBoost() { return hasSpeedBoost; }
+    public boolean hasSlowMotion() { return hasSlowMotion; }
+    public void useShield() { hasShield = false; }
+
+    public boolean isBossActive() { return bossActive; }
+    public void setBossActive(boolean active) { this.bossActive = active; }
+    public int getLastBossScore() { return lastBossScore; }
+    public void setLastBossScore(int score) { this.lastBossScore = score; }
+
+    public int getEnemySpeed() { 
+        return 7 + (currentScore / 2000); 
+    }
+    
+    public long getEnemySpawnDelay() { 
+        return Math.max(500, 1500 - (currentScore / 10)); 
     }
 
-    public boolean hasDoubleShot() {
-        return hasDoubleShot && System.currentTimeMillis() <= doubleShotEndTime;
-    }
-
-    public boolean hasSpeedBoost() {
-        return hasSpeedBoost && System.currentTimeMillis() <= speedBoostEndTime;
-    }
-
-    public boolean hasSlowMotion() {
-        return hasSlowMotion && System.currentTimeMillis() <= slowMotionEndTime;
-    }
-
-    public void useShield() {
-        hasShield = false;
+    public float getSpawnChance(float timeScale) {
+        float baseChance = 5 + (currentScore / 1000f);
+        return baseChance * timeScale;
     }
 
     public void resetForNewGame() {
         currentScore = 0;
-        hasShield = false;
-        hasDoubleShot = false;
-        hasSpeedBoost = false;
-        hasSlowMotion = false;
-        applyLevelSettings();
-    }
-
-    public String getLevelName() {
-        switch (selectedLevel) {
-            case LEVEL_1:
-                return "Nivel 1 - Facil";
-            case LEVEL_2:
-                return "Nivel 2 - Medio";
-            case LEVEL_3:
-                return "Nivel 3 - Dificil";
-            case LEVEL_ARCADE:
-            default:
-                return "Arcade - Infinito";
-        }
-    }
-
-    public String getMapName() {
-        switch (selectedMap) {
-            case MAP_SUNSET:
-                return "Atardecer";
-            case MAP_AURORA:
-                return "Aurora Boreal";
-            case MAP_SPACE:
-            default:
-                return "Espacio";
-        }
+        setMap(MAP_SPACE);
+        hasShield = hasDoubleShot = hasTripleShot = hasSpeedBoost = hasSlowMotion = false;
+        bossActive = false;
+        lastBossScore = 0;
     }
 }
