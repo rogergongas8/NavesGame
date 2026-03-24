@@ -10,20 +10,34 @@ public class PowerUp {
     public static final int TYPE_SLOW_MOTION = 3;
     public static final int TYPE_TRIPLE_SHOT = 4;
     public static final int TYPE_BOMB = 5;
+    public static final int TYPE_HEALTH = 6;
 
     public static final int POWER_UP_SIZE = 50;
 
     private int x, y, type, speed = 4;
+    private boolean isLandscape = false;
     private Random random = new Random();
 
-    public PowerUp(int screenWidth, int screenHeight, int minY) {
-        this.x = random.nextInt(Math.max(1, screenWidth - POWER_UP_SIZE));
-        this.y = -50;
-        this.type = random.nextInt(6);
+    public PowerUp(int screenWidth, int screenHeight, boolean isLandscape) {
+        this.isLandscape = isLandscape;
+        if (isLandscape) {
+            this.x = -50;
+            this.y = random.nextInt(Math.max(1, screenHeight - POWER_UP_SIZE));
+        } else {
+            this.x = random.nextInt(Math.max(1, screenWidth - POWER_UP_SIZE));
+            this.y = -50;
+        }
+        this.type = random.nextInt(7);
     }
 
-    public void update() { y += speed; }
-    public boolean isOffScreen(int screenHeight) { return y > screenHeight; }
+    public void update() { 
+        if (isLandscape) x += speed;
+        else y += speed; 
+    }
+    public boolean isOffScreen(int screenWidth, int screenHeight) { 
+        if (isLandscape) return x > screenWidth;
+        return y > screenHeight; 
+    }
     public int getX() { return x; }
     public int getY() { return y; }
     public void setX(int x) { this.x = x; }
@@ -37,6 +51,7 @@ public class PowerUp {
             case TYPE_SPEED_BOOST: return Color.GREEN;
             case TYPE_SLOW_MOTION: return Color.BLUE;
             case TYPE_BOMB: return Color.RED;
+            case TYPE_HEALTH: return 0xFFFF44AA; // Rosa/Rojo claro para salud
             default: return Color.WHITE;
         }
     }
@@ -49,6 +64,7 @@ public class PowerUp {
             case TYPE_SPEED_BOOST: return "V";
             case TYPE_SLOW_MOTION: return "T";
             case TYPE_BOMB: return "B";
+            case TYPE_HEALTH: return "+";
             default: return "?";
         }
     }
@@ -61,6 +77,7 @@ public class PowerUp {
             case TYPE_SPEED_BOOST: gameState.activateSpeedBoost(10000); break;
             case TYPE_SLOW_MOTION: gameState.activateSlowMotion(5000); break;
             case TYPE_BOMB: view.triggerBomb(); break;
+            case TYPE_HEALTH: gameState.addHealth(1); break;
         }
     }
 }

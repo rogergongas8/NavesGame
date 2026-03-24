@@ -26,7 +26,10 @@ public class GameActivity extends AppCompatActivity {
         Point size = new Point();
         getWindowManager().getDefaultDisplay().getRealSize(size);
 
-        gameView = new GameView(this, size.x, size.y);
+        String playerName = getIntent().getStringExtra("PLAYER_NAME");
+        if (playerName == null) playerName = "Guest";
+
+        gameView = new GameView(this, size.x, size.y, playerName);
         setContentView(gameView);
         
         // Modo inmersivo para ocultar botones de navegación

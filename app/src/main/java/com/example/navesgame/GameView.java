@@ -36,6 +36,8 @@ public class GameView extends SurfaceView implements Runnable {
 
     private RectF[] mapButtons = new RectF[3];
     private String[] mapNames = {"ESPACIO", "ATARDECER", "AURORA"};
+    private RectF[] diffButtons = new RectF[3];
+    private String[] diffNames = {"FÁCIL", "NORMAL", "DIFÍCIL"};
 
     private int playerX, playerY, playerSize = 80;
     private List<Bullet> bullets = new ArrayList<>();
@@ -63,8 +65,9 @@ public class GameView extends SurfaceView implements Runnable {
 
     private static final int[][] SPRITE_PLAYER = {{0,0,0,2,0,0,0},{0,0,1,1,1,0,0},{0,1,1,2,1,1,0},{1,1,0,1,0,1,1},{1,1,1,1,1,1,1},{1,0,1,0,1,0,1}};
     private static final int[][] SPRITE_BOSS = {{0,0,1,1,1,1,1,0,0},{0,1,2,2,2,2,2,1,0},{1,2,1,1,2,1,1,2,1},{1,2,2,2,1,2,2,2,1},{1,1,1,1,1,1,1,1,1},{0,1,0,1,0,1,0,1,0}};
+    private static final int[][] SPRITE_POWERUP = {{1,1,1,1,1,1,1},{1,0,0,0,0,0,1},{1,0,2,2,2,0,1},{1,0,2,0,2,0,1},{1,0,2,2,2,0,1},{1,0,0,0,0,0,1},{1,1,1,1,1,1,1}};
 
-    public GameView(Context context, int screenX, int screenY) {
+    public GameView(Context context, int screenX, int screenY, String playerName) {
         super(context);
         this.screenX = screenX; this.screenY = screenY;
         this.isLandscape = screenX > screenY;
@@ -72,6 +75,7 @@ public class GameView extends SurfaceView implements Runnable {
         this.paint = new Paint();
         this.paint.setTypeface(Typeface.MONOSPACE);
         this.gameState = new GameState();
+        this.gameState.setPlayerName(playerName);
         try { toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100); } catch (Exception e) {}
         
         stars = new Star[100];
@@ -86,7 +90,7 @@ public class GameView extends SurfaceView implements Runnable {
 
     private void resetPlayerPosition() {
         if (isLandscape) {
-            this.playerX = 100;
+            this.playerX = screenX - 100 - playerSize;
             this.playerY = screenY / 2 - 40;
         } else {
             this.playerX = screenX / 2 - 40;
@@ -102,6 +106,11 @@ public class GameView extends SurfaceView implements Runnable {
             float x = (screenX - btnW) / 2;
             float y = startY + i * (btnH + 30);
             mapButtons[i] = new RectF(x, y, x + btnW, y + btnH);
+            
+            // Botones de dificultad a la derecha/abajo dependiendo de la orientación
+            float dx = isLandscape ? x + btnW + 50 : x;
+            float dy = isLandscape ? y : startY + 4 * (btnH + 30) + i * (btnH + 30);
+            diffButtons[i] = new RectF(dx, dy, dx + (isLandscape ? 300 : btnW), dy + btnH);
         }
     }
 
@@ -126,22 +135,15 @@ public class GameView extends SurfaceView implements Runnable {
     }
 
     private void update() {
-        boolean currentLandscape = getWidth() > getHeight();
-        if (currentLandscape != isLandscape) {
-            float ratioX = (float)getWidth() / screenX;
-            float ratioY = (float)getHeight() / screenY;
-            isLandscape = currentLandscape;
-            screenX = getWidth();
-            screenY = getHeight();
-            
-            // Reposicionar jugador y objetos proporcionalmente
-            playerX *= ratioX;
-            playerY *= ratioY;
-            for (Enemigo e : enemies) { e.x *= ratioX; e.y *= ratioY; }
-            for (Bullet b : bullets) { b.x *= ratioX; b.y *= ratioY; }
-            for (Bullet b : enemyBullets) { b.x *= ratioX; b.y *= ratioY; }
-            for (PowerUp p : powerUps) { p.setX((int)(p.getX() * ratioX)); p.setY((int)(p.getY() * ratioY)); }
-            
+        int w = getWidth();
+        int h = getHeight();
+        if (w <= 0 || h <= 0) return;
+
+        if (w != screenX || h != screenY) {
+            isLandscape = w > h;
+            screenX = w;
+            screenY = h;
+            resetPlayerPosition();
             initMenuButtons();
         }
 
@@ -159,9 +161,9 @@ public class GameView extends SurfaceView implements Runnable {
         
         // Estela del motor del jugador
         if (gameState.getState() == GameState.STATE_PLAYING) {
-            float tailX = playerX + (isLandscape ? -20 : playerSize/2);
+            float tailX = playerX + (isLandscape ? playerSize + 20 : playerSize/2);
             float tailY = playerY + (isLandscape ? playerSize/2 : playerSize);
-            particles.add(new Particle(tailX, tailY, Color.YELLOW, isLandscape ? -5 : 0, isLandscape ? 0 : 5));
+            particles.add(new Particle(tailX, tailY, Color.YELLOW, isLandscape ? 5 : 0, isLandscape ? 0 : 5));
         }
         if (screenShakeFrames > 0) screenShakeFrames--;
         gameTime += 16;
@@ -192,6 +194,7 @@ public class GameView extends SurfaceView implements Runnable {
         
         if (gameState.getScore() >= gameState.getLastBossScore() + 1500) {
             if (!gameState.isBossActive()) {
+                enemies.clear(); // Limpiar pantalla para el Jefe
                 enemies.add(new Enemigo(screenX, screenY, true, isLandscape, gameState));
                 gameState.setBossActive(true);
                 gameState.setLastBossScore(gameState.getScore());
@@ -201,7 +204,7 @@ public class GameView extends SurfaceView implements Runnable {
         if (!gameState.isBossActive() && random.nextFloat() * 100 < gameState.getSpawnChance(timeScale)) {
             enemies.add(new Enemigo(screenX, screenY, isLandscape, gameState));
         }
-        if (random.nextInt(1000) < 4) powerUps.add(new PowerUp(screenX, screenY, 0));
+        if (random.nextInt(1000) < 4) powerUps.add(new PowerUp(screenX, screenY, isLandscape));
 
         for (int i = bullets.size()-1; i>=0; i--) {
             Bullet b = bullets.get(i);
@@ -214,7 +217,12 @@ public class GameView extends SurfaceView implements Runnable {
             b.x += b.vx; b.y += b.vy;
             if (checkCollision((int)b.x, (int)b.y, ENEMY_BULLET_SIZE, ENEMY_BULLET_SIZE, playerX, playerY, playerSize, playerSize)) {
                 if (gameState.hasShield()) { gameState.useShield(); enemyBullets.remove(i); screenShakeFrames = 15; }
-                else { gameOver(); return; }
+                else { 
+                    gameState.takeDamage();
+                    enemyBullets.remove(i);
+                    screenShakeFrames = 30;
+                    if (gameState.isPlayerDead()) { gameOver(); return; }
+                }
             }
             if (b.x > screenX + 100 || b.y > screenY + 100 || b.x < -100 || b.y < -100) enemyBullets.remove(i);
         }
@@ -225,22 +233,56 @@ public class GameView extends SurfaceView implements Runnable {
             
             // Patrón de Ataque Avanzado del Boss
             if (e.isBoss) {
-                // Ataque 1: Ráfaga Circular (Cada 5 segundos)
-                if (gameTime % 5000 < 100) {
-                    for (int angle = 0; angle < 360; angle += 45) {
-                        if (angle == 180 || angle == 225) continue; // Huecos para esquivar
-                        float rad = (float) Math.toRadians(angle);
-                        float vx = (float) (Math.cos(rad) * 15);
-                        float vy = (float) (Math.sin(rad) * 15);
-                        enemyBullets.add(new Bullet(e.x + (isLandscape ? 50 : 150), e.y + (isLandscape ? 100 : 150), vx, vy));
+                e.bossTime += 16;
+                long bt = e.bossTime;
+                
+                if (e.bossType == 0) { // Boss Rojo: Circular + Sine
+                    if (bt % 4000 < 100) { // Circular burst
+                        for (int a = 0; a < 360; a += 45) {
+                            if (a == 180) continue;
+                            float rad = (float)Math.toRadians(a);
+                            enemyBullets.add(new Bullet(e.x+150, e.y+100, (float)Math.cos(rad)*14, (float)Math.sin(rad)*14));
+                        }
+                    }
+                    if (bt % 1500 < 600 && bt % 200 < 40) { // Sine stream
+                        float off = (float)Math.sin(bt/150.0)*15;
+                        enemyBullets.add(new Bullet(e.x+200, e.y+100, isLandscape?18:off, isLandscape?off:18));
+                    }
+                } 
+                else if (e.bossType == 1) { // Boss Púrpura: Tracking + Triple
+                    if (bt % 300 < 40) { // Tracking shot (Hacia el jugador)
+                        float dx = playerX - e.x, dy = playerY - e.y;
+                        float dist = (float)Math.sqrt(dx*dx+dy*dy);
+                        enemyBullets.add(new Bullet(e.x+150, e.y+100, (dx/dist)*22, (dy/dist)*22));
+                    }
+                    if (bt % 2500 < 100) { // Triple spread
+                        for(int j=-1; j<=1; j++) enemyBullets.add(new Bullet(e.x+150, e.y+100, isLandscape?15:j*5, isLandscape?j*5:15));
                     }
                 }
-                // Ataque 2: Cadena Sinusoidal Esquivable (Cada 2 segundos)
-                if (gameTime % 2000 < 800 && gameTime % 150 < 30) {
-                    float offset = (float) Math.sin(gameTime / 200.0) * 10;
-                    float vx = isLandscape ? -20 : offset;
-                    float vy = isLandscape ? offset : 20;
-                    enemyBullets.add(new Bullet(e.x + (isLandscape ? 50 : 150), e.y + (isLandscape ? 100 : 150), vx, vy));
+                else if (e.bossType == 2) { // Boss Dorado: Heavy Bombardment + Rotating
+                    if (bt % 2000 < 100) { // Heavy 5-way
+                        for(int j=-2; j<=2; j++) enemyBullets.add(new Bullet(e.x+150, e.y+100, isLandscape?12:j*6, isLandscape?j*6:12));
+                    }
+                    float rotA = (bt / 10.0f) % 360;
+                    if (bt % 100 < 20) {
+                        float rad = (float)Math.toRadians(rotA);
+                        enemyBullets.add(new Bullet(e.x+150, e.y+100, (float)Math.cos(rad)*10, (float)Math.sin(rad)*10));
+                    }
+                }
+                else if (e.bossType == 3) { // BOSS FINAL: Bullet Hell Stationary
+                    if (bt % 100 < 20) { // Infinite Spiral
+                        float ang = (bt / 2.0f) % 360;
+                        float rad = (float)Math.toRadians(ang);
+                        enemyBullets.add(new Bullet(e.x+200, e.y+150, (float)Math.cos(rad)*12, (float)Math.sin(rad)*12));
+                        rad = (float)Math.toRadians(ang + 180);
+                        enemyBullets.add(new Bullet(e.x+200, e.y+150, (float)Math.cos(rad)*12, (float)Math.sin(rad)*12));
+                    }
+                    if (bt % 3000 < 100) { // Mega Burst
+                        for (int a = 0; a < 360; a += 30) {
+                            float rad = (float)Math.toRadians(a);
+                            enemyBullets.add(new Bullet(e.x+200, e.y+150, (float)Math.cos(rad)*8, (float)Math.sin(rad)*8));
+                        }
+                    }
                 }
             }
 
@@ -248,25 +290,55 @@ public class GameView extends SurfaceView implements Runnable {
 
             if (checkCollision(e.x, e.y, ew, eh, playerX, playerY, playerSize, playerSize)) {
                 if (gameState.hasShield()) { gameState.useShield(); if(!e.isBoss) enemies.remove(i); screenShakeFrames = 25; }
-                else { gameOver(); return; }
+                else { 
+                    gameState.takeDamage();
+                    if(!e.isBoss) enemies.remove(i);
+                    screenShakeFrames = 40;
+                    if (gameState.isPlayerDead()) { gameOver(); return; }
+                }
             }
 
             for (int j = bullets.size()-1; j>=0; j--) {
                 Bullet b = bullets.get(j);
-                if (checkCollision(e.x, e.y, ew, eh, b.x, b.y, BULLET_SIZE, BULLET_SIZE)) {
+                if (checkCollision(e.x, e.y, ew, eh, (int)b.x, (int)b.y, BULLET_SIZE, BULLET_SIZE)) {
                     bullets.remove(j); e.hp--;
                     if (e.hp <= 0) {
                         Particle[] exp = Particle.createEnemyExplosion(e.x + ew/2, e.y + eh/2, e.color);
                         for (Particle p : exp) particles.add(p);
-                        if (e.isBoss) { gameState.setBossActive(false); gameState.addScore(500); screenShakeFrames = 60; }
+                        if (e.isBoss) { 
+                            gameState.setBossActive(false); 
+                            
+                            if (e.bossType == 3) { // Victoria Jefe Final
+                                long killTime = System.currentTimeMillis() - gameState.getLastBossSpawnTime();
+                                gameState.setInfiniteMode(true);
+                                // Registrar en Scoreboard Mundial
+                                CloudScoreboard.postScore(gameState.getPlayerName(), gameState.getScore(), killTime, new CloudScoreboard.ScoreCallback() {
+                                    @Override public void onSuccess(String r) { combo = 0; } // Usar combo como flag temporal
+                                    @Override public void onError(String er) {}
+                                });
+                            }
+                            
+                            gameState.incrementBossesKilled();
+                            gameState.addScore(500); 
+                            gameState.setLastBossScore(gameState.getScore()); 
+                            screenShakeFrames = 60; 
+                            if (!gameState.isManualMapSelection()) gameState.setMap(gameState.getLevel() % 3);
+                            enemies.remove(i); 
+                        }
                         else { combo++; lastKillTime = now; gameState.addScore(20 + combo*4); enemies.remove(i); }
                         playSound(ToneGenerator.TONE_PROP_BEEP2, 50);
                         break;
                     }
                 }
             }
-            if (isLandscape && e.x < -350) enemies.remove(i);
-            else if (!isLandscape && e.y > screenY + 150) enemies.remove(i);
+            if (isLandscape && e.x > screenX + 400) { 
+                if(e.isBoss) { gameState.setBossActive(false); gameState.setLastBossScore(gameState.getScore()); }
+                enemies.remove(i); 
+            }
+            else if (!isLandscape && e.y > screenY + 200) { 
+                if(e.isBoss) { gameState.setBossActive(false); gameState.setLastBossScore(gameState.getScore()); }
+                enemies.remove(i); 
+            }
         }
 
         for (int i = powerUps.size()-1; i>=0; i--) {
@@ -274,7 +346,7 @@ public class GameView extends SurfaceView implements Runnable {
             if (checkCollision(p.getX(), p.getY(), POWERUP_SIZE, POWERUP_SIZE, playerX, playerY, playerSize, playerSize)) {
                 p.applyEffect(gameState, this); powerUps.remove(i);
                 playSound(ToneGenerator.TONE_PROP_BEEP, 100);
-            } else if (p.isOffScreen(screenY)) powerUps.remove(i);
+            } else if (p.isOffScreen(screenX, screenY)) powerUps.remove(i);
         }
         if (now - lastKillTime > 1500) combo = 0;
     }
@@ -284,17 +356,17 @@ public class GameView extends SurfaceView implements Runnable {
         if (now - lastShotTime > 140) {
             int mx = playerX + playerSize/2 - 10;
             int my = playerY + playerSize/2 - 10;
-            float vx = isLandscape ? 40 : 0;
+            float vx = isLandscape ? -40 : 0;
             float vy = isLandscape ? 0 : -40;
 
-            bullets.add(new Bullet(isLandscape ? playerX + playerSize : mx, isLandscape ? my : playerY, vx, vy));
-            
+            bullets.add(new Bullet(isLandscape ? playerX : mx, isLandscape ? my : playerY, vx, vy));
+
             if (gameState.hasDoubleShot()) {
-                bullets.add(new Bullet(isLandscape ? playerX + playerSize - 25 : mx - 35, isLandscape ? my - 35 : playerY + 25, vx, vy));
+                bullets.add(new Bullet(isLandscape ? playerX + 25 : mx - 35, isLandscape ? my - 35 : playerY + 25, vx, vy));
             }
-            if (gameState.hasTripleShot()) { 
-                bullets.add(new Bullet(isLandscape ? playerX + playerSize - 25 : mx + 35, isLandscape ? my + 35 : playerY + 25, vx, vy)); 
-                bullets.add(new Bullet(isLandscape ? playerX + playerSize + 25 : mx, isLandscape ? my : playerY - 35, vx, vy)); 
+            if (gameState.hasTripleShot()) {
+                bullets.add(new Bullet(isLandscape ? playerX + 25 : mx + 35, isLandscape ? my + 35 : playerY + 25, vx, vy));
+                bullets.add(new Bullet(isLandscape ? playerX - 25 : mx, isLandscape ? my : playerY - 35, vx, vy));
             }
             lastShotTime = now; playSound(ToneGenerator.TONE_PROP_BEEP, 40);
         }
@@ -306,7 +378,11 @@ public class GameView extends SurfaceView implements Runnable {
         drawBackground(canvas);
         
         if (gameState.getState() == GameState.STATE_PLAYING || gameState.getState() == GameState.STATE_GAME_OVER) {
-            for (PowerUp p : powerUps) drawPixelSprite(canvas, p.getX(), p.getY(), 12, p.getColor(), Color.WHITE, SPRITE_PLAYER);
+            for (PowerUp p : powerUps) {
+                drawPixelSprite(canvas, p.getX(), p.getY(), 8, p.getColor(), Color.WHITE, SPRITE_POWERUP);
+                paint.setColor(Color.WHITE); paint.setTextSize(35); paint.setTextAlign(Paint.Align.CENTER);
+                canvas.drawText(p.getIcon(), p.getX() + 28, p.getY() + 38, paint);
+            }
             for (Particle p : particles) { paint.setColor(p.getColor()); canvas.drawRect(p.getX(), p.getY(), p.getX()+p.getSize(), p.getY()+p.getSize(), paint); }
             
             if (gameState.hasShield()) {
@@ -315,7 +391,7 @@ public class GameView extends SurfaceView implements Runnable {
             }
             
             canvas.save();
-            if (isLandscape) canvas.rotate(-90, playerX + playerSize/2, playerY + playerSize/2);
+            if (isLandscape) canvas.rotate(-90, playerX + playerSize/2, playerY + playerSize/2); // Apuntar a la IZQUIERDA
             drawPixelSprite(canvas, playerX, playerY, 12, Color.CYAN, Color.WHITE, SPRITE_PLAYER);
             canvas.restore();
             
@@ -327,21 +403,53 @@ public class GameView extends SurfaceView implements Runnable {
             for (Enemigo e : enemies) {
                 if (e.isBoss) {
                     canvas.save();
-                    if (isLandscape) canvas.rotate(90, e.x+150, e.y+100);
-                    drawPixelSprite(canvas, e.x, e.y, 25, Color.RED, Color.YELLOW, SPRITE_BOSS);
+                    if (isLandscape) canvas.rotate(90, e.x + (e.bossType==3?250:150), e.y + (e.bossType==3?200:100));
+                    int[][] bSprite = (e.bossType == 3) ? Enemigo.SPRITE_FINAL_BOSS : SPRITE_BOSS;
+                    int ps = (e.bossType == 3) ? 40 : 25;
+                    drawPixelSprite(canvas, e.x, e.y, ps, e.color, Color.YELLOW, bSprite);
                     canvas.restore();
+                    
                     paint.setColor(Color.DKGRAY); canvas.drawRect(100, 50, screenX-100, 80, paint);
-                    paint.setColor(Color.RED); canvas.drawRect(100, 50, 100 + (screenX-200)*(e.hp/(float)e.maxHp), 80, paint);
+                    paint.setColor(e.color); canvas.drawRect(100, 50, 100 + (screenX-200)*(e.hp/(float)e.maxHp), 80, paint);
+                    paint.setColor(Color.WHITE); paint.setTextSize(30); paint.setTextAlign(Paint.Align.CENTER);
+                    canvas.drawText((e.bossType==3?"FINAL BOSS HP: ":"HP: ") + e.hp + " / " + e.maxHp, screenX/2, 75, paint);
+                    
+                    if (e.bossTime < 3000) {
+                        paint.setColor(Color.YELLOW); paint.setTextSize(100); paint.setTextAlign(Paint.Align.CENTER);
+                        String msg = (e.bossType == 3) ? "¡¡ALERTA: JEFE FINAL!!" : "¡JEFE NIVEL " + gameState.getLevel() + "!";
+                        canvas.drawText(msg, screenX/2, screenY/2 - 200, paint);
+                    }
+
+                    if (e.bossType == 3 && gameState.getLastBossSpawnTime() == 0) {
+                        gameState.setLastBossSpawnTime(System.currentTimeMillis());
+                    }
                 } else {
                     canvas.save();
                     if (isLandscape) canvas.rotate(90, e.x+40, e.y+40);
-                    drawPixelSprite(canvas, e.x, e.y, 12, e.color, Color.BLACK, SPRITE_PLAYER);
+                    int[][] s = Enemigo.SPRITE_NORMAL;
+                    if (e.tipo == Enemigo.TYPE_FAST) s = Enemigo.SPRITE_FAST;
+                    else if (e.tipo == Enemigo.TYPE_TANK) s = Enemigo.SPRITE_TANK;
+                    else if (e.tipo == Enemigo.TYPE_ZIGZAG) s = Enemigo.SPRITE_ZIGZAG;
+                    drawPixelSprite(canvas, e.x, e.y, 12, e.color, Color.BLACK, s);
                     canvas.restore();
                 }
             }
             paint.setTextAlign(Paint.Align.LEFT); paint.setColor(Color.WHITE); paint.setTextSize(60);
-            canvas.drawText("SCORE: " + gameState.getScore(), 60, 160, paint);
-            if (combo > 1) { paint.setColor(Color.YELLOW); canvas.drawText("COMBO X" + combo, 60, 230, paint); }
+            canvas.drawText("SCORE: " + gameState.getScore(), 60, 100, paint);
+            canvas.drawText("LEVEL: " + (gameState.isInfiniteMode() ? "∞" : gameState.getLevel()), 60, 160, paint);
+            
+            if (gameState.isInfiniteMode()) {
+                paint.setColor(Color.YELLOW); paint.setTextSize(40); paint.setTextAlign(Paint.Align.RIGHT);
+                canvas.drawText("INFINITE MODE ON | Q TO STOP", screenX - 50, 100, paint);
+                paint.setTextAlign(Paint.Align.LEFT); paint.setTextSize(60); // Reset
+            }
+            
+            // Barra de Vida
+            paint.setColor(Color.GRAY); canvas.drawRect(60, 180, 360, 210, paint);
+            paint.setColor(Color.GREEN); 
+            canvas.drawRect(60, 180, 60 + (300 * (gameState.getPlayerHealth()/3.0f)), 210, paint);
+            
+            if (combo > 1) { paint.setColor(Color.YELLOW); canvas.drawText("COMBO X" + combo, 60, 270, paint); }
         }
         
         if (gameState.getState() == GameState.STATE_MENU) {
@@ -354,7 +462,12 @@ public class GameView extends SurfaceView implements Runnable {
             for (int i = 0; i < 3; i++) {
                 paint.setColor(Color.parseColor("#222222")); canvas.drawRoundRect(mapButtons[i], 20, 20, paint);
                 paint.setColor(Color.WHITE); paint.setTextSize(45);
-                canvas.drawText(mapNames[i], screenX/2, mapButtons[i].centerY() + 15, paint);
+                canvas.drawText(mapNames[i], mapButtons[i].centerX(), mapButtons[i].centerY() + 15, paint);
+
+                paint.setColor(gameState.getDifficulty() == i ? Color.GREEN : Color.parseColor("#333333"));
+                canvas.drawRoundRect(diffButtons[i], 20, 20, paint);
+                paint.setColor(Color.WHITE);
+                canvas.drawText(diffNames[i], diffButtons[i].centerX(), diffButtons[i].centerY() + 15, paint);
             }
         }
         
@@ -396,7 +509,7 @@ public class GameView extends SurfaceView implements Runnable {
 
         paint.setColor(Color.WHITE);
         for (Star s : stars) {
-            if (isLandscape) { s.x -= s.speed; if (s.x < 0) s.x = screenX; }
+            if (isLandscape) { s.x += s.speed; if (s.x > screenX) s.x = 0; } // Estrellas hacia la DERECHA
             else { s.y += s.speed; if (s.y > screenY) s.y = 0; }
             paint.setAlpha(random.nextInt(150)+105);
             canvas.drawRect(s.x, s.y, s.x+5, s.y+5, paint);
@@ -423,9 +536,14 @@ public class GameView extends SurfaceView implements Runnable {
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 if (gameState.getState() == GameState.STATE_MENU) {
-                    for (int i = 0; i < 3; i++) if (mapButtons[i].contains(tx, ty)) {
-                        gameState.setMap(i); gameState.resetForNewGame(); gameState.setState(GameState.STATE_PLAYING);
-                        enemies.clear(); bullets.clear(); powerUps.clear(); enemyBullets.clear(); return true;
+                    for (int i = 0; i < 3; i++) {
+                        if (mapButtons[i].contains(tx, ty)) {
+                            gameState.setMap(i); gameState.resetForNewGame(); gameState.setState(GameState.STATE_PLAYING);
+                            enemies.clear(); bullets.clear(); powerUps.clear(); enemyBullets.clear(); return true;
+                        }
+                        if (diffButtons[i].contains(tx, ty)) {
+                            gameState.setDifficulty(i); return true;
+                        }
                     }
                 } else if (gameState.getState() == GameState.STATE_GAME_OVER) {
                     gameState.setState(GameState.STATE_MENU);
@@ -456,6 +574,11 @@ public class GameView extends SurfaceView implements Runnable {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (keyCode == KeyEvent.KEYCODE_Q) {
+            gameState.setState(GameState.STATE_MENU);
+            gameState.resetForNewGame();
+            return true;
+        }
         if (gameState.getState() == GameState.STATE_PLAYING) {
             if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) moveLeft = true;
             if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) moveRight = true;
@@ -483,11 +606,26 @@ public class GameView extends SurfaceView implements Runnable {
 
     public void triggerBomb() {
         screenShakeFrames = 45;
-        for (Enemigo e : enemies) {
-            Particle[] exp = Particle.createEnemyExplosion(e.x+50, e.y+50, e.color);
+        for (int i = enemies.size() - 1; i >= 0; i--) {
+            Enemigo e = enemies.get(i);
+            Particle[] exp = Particle.createEnemyExplosion(e.x + 50, e.y + 50, e.color);
             for (Particle p : exp) particles.add(p);
+            
+            if (e.isBoss) {
+                e.hp -= 20; // 20 de daño al Jefe
+                if (e.hp <= 0) {
+                    gameState.setBossActive(false);
+                    gameState.incrementBossesKilled();
+                    gameState.addScore(500);
+                    gameState.setLastBossScore(gameState.getScore());
+                    enemies.remove(i);
+                }
+            } else {
+                enemies.remove(i);
+            }
         }
-        enemies.clear(); enemyBullets.clear(); gameState.setBossActive(false);
+        enemyBullets.clear();
+        gameState.setLastBossScore(gameState.getScore()); // Asegurar gap tras bomba
         playSound(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 500);
     }
 
