@@ -11,6 +11,7 @@ import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.SurfaceHolder;
@@ -311,10 +312,11 @@ public class GameView extends SurfaceView implements Runnable {
                             if (e.bossType == 3) { // Victoria Jefe Final
                                 long killTime = System.currentTimeMillis() - gameState.getLastBossSpawnTime();
                                 gameState.setInfiniteMode(true);
-                                // Registrar en Scoreboard Mundial
-                                CloudScoreboard.postScore(gameState.getPlayerName(), gameState.getScore(), killTime, new CloudScoreboard.ScoreCallback() {
-                                    @Override public void onSuccess(String r) { combo = 0; } // Usar combo como flag temporal
-                                    @Override public void onError(String er) {}
+                                
+                                // Registrar en Scoreboard Mundial (Tiempo de Boss y Puntuación)
+                                CloudScoreboard.postBossRun(gameState.getPlayerName(), killTime, gameState.getScore(), new CloudScoreboard.ScoreCallback() {
+                                    @Override public void onSuccess(String r) { Log.d("Cloud", "Boss run saved"); }
+                                    @Override public void onError(String er) { Log.e("Cloud", "Error saving boss run: " + er); }
                                 });
                             }
                             
@@ -524,7 +526,17 @@ public class GameView extends SurfaceView implements Runnable {
         }
     }
 
-    private void gameOver() { gameState.setState(GameState.STATE_GAME_OVER); gameState.updateHighScore(); isTouching = false; }
+    private void gameOver() {
+        gameState.setState(GameState.STATE_GAME_OVER);
+        gameState.updateHighScore();
+        isTouching = false;
+
+        // Guardar puntuación en la nube al morir
+        CloudScoreboard.postHighScore(gameState.getPlayerName(), gameState.getScore(), new CloudScoreboard.ScoreCallback() {
+            @Override public void onSuccess(String r) { Log.d("Cloud", "Score saved"); }
+            @Override public void onError(String er) { Log.e("Cloud", "Error saving score: " + er); }
+        });
+    }
     private void sleep() { try { Thread.sleep(1); } catch (Exception e) {} }
     private void playSound(int t, int d) { if (toneGenerator != null) toneGenerator.startTone(t, d); }
     public void resume() { isPlaying = true; thread = new Thread(this); thread.start(); }

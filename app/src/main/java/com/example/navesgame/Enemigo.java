@@ -57,7 +57,7 @@ public class Enemigo {
 
     public Enemigo(int screenX, int screenY, boolean isBoss, boolean isLandscape, GameState gameState) {
         this.isBoss = true;
-        this.bossType = (gameState.getBossesKilled() % 4); // Aumentado a 4 para incluir Final Boss
+        this.bossType = (gameState.getBossesKilled() % 4);
         
         if (isLandscape) {
             this.x = -400;

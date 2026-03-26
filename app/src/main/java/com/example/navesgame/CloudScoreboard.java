@@ -2,122 +2,130 @@ package com.example.navesgame;
 
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
+import androidx.annotation.NonNull;
 
-import java.io.IOException;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
+import com.google.firebase.database.ValueEventListener;
+
 import java.util.ArrayList;
 import java.util.List;
 
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-
 public class CloudScoreboard {
-    private static final String APP_ID = "YOUR_APP_ID"; // Rellenar
-    private static final String API_KEY = "YOUR_API_KEY"; // Rellenar
-    private static final String BASE_URL = "https://eu-central-1.aws.data.mongodb-api.com/app/" + APP_ID + "/endpoint/data/v1/action/";
-    private static final String CLUSTER = "Cluster0";
-    private static final String DATABASE = "NavesGame";
-    private static final String COLLECTION = "Scoreboard";
+    private static final String DATABASE_URL = "https://navesgame-default-rtdb.europe-west1.firebasedatabase.app/";
+    private static final DatabaseReference database = FirebaseDatabase.getInstance(DATABASE_URL).getReference();
+    private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    private static final OkHttpClient client = new OkHttpClient();
-    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+    public static void postHighScore(String name, int points, ScoreCallback callback) {
+        DatabaseReference scoresRef = database.child("scores").push();
+        ScoreEntry entry = new ScoreEntry(name, points, System.currentTimeMillis());
+        scoresRef.setValue(entry).addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                if (callback != null) mainHandler.post(() -> callback.onSuccess("Puntuación guardada"));
+            } else {
+                if (callback != null) mainHandler.post(() -> callback.onError(task.getException().getMessage()));
+            }
+        });
+    }
+
+    public static void postBossRun(String name, long time, int points, ScoreCallback callback) {
+        DatabaseReference runsRef = database.child("boss_runs").push();
+        BossRunEntry entry = new BossRunEntry(name, time, points, System.currentTimeMillis());
+        runsRef.setValue(entry).addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                if (callback != null) mainHandler.post(() -> callback.onSuccess("Tiempo de jefe guardado"));
+            } else {
+                if (callback != null) mainHandler.post(() -> callback.onError(task.getException().getMessage()));
+            }
+        });
+    }
+
+    public static void getTopScores(ScoreCallback callback) {
+        Query topScores = database.child("scores").orderByChild("points").limitToLast(10);
+        topScores.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                StringBuilder sb = new StringBuilder("🏆 GLOBAL TOP 10 🏆\n\n");
+                List<ScoreEntry> entries = new ArrayList<>();
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    entries.add(0, ds.getValue(ScoreEntry.class)); // Reversa para que el mayor esté arriba
+                }
+                if (entries.isEmpty()) sb.append("(No scores yet)");
+                for (int i = 0; i < entries.size(); i++) {
+                    ScoreEntry e = entries.get(i);
+                    sb.append(String.format("%d. %s: %d pts\n", i + 1, e.name, e.points));
+                }
+                mainHandler.post(() -> callback.onSuccess(sb.toString()));
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                mainHandler.post(() -> callback.onError(error.getMessage()));
+            }
+        });
+    }
+
+    public static void getTopBossRuns(ScoreCallback callback) {
+        Query topRuns = database.child("boss_runs").orderByChild("time").limitToFirst(10);
+        topRuns.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                StringBuilder sb = new StringBuilder("⏱️ BOSS SPEEDRUNS ⏱️\n\n");
+                int count = 1;
+                for (DataSnapshot ds : snapshot.getChildren()) {
+                    BossRunEntry e = ds.getValue(BossRunEntry.class);
+                    sb.append(String.format("%d. %s: %.2fs\n", count++, e.name, e.time / 1000.0));
+                }
+                if (count == 1) sb.append("(No runs yet)");
+                mainHandler.post(() -> callback.onSuccess(sb.toString()));
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                mainHandler.post(() -> callback.onError(error.getMessage()));
+            }
+        });
+    }
+
+    public static void testConnection(ScoreCallback callback) {
+        database.child("test").setValue("ping").addOnCompleteListener(task -> {
+            if (task.isSuccessful()) mainHandler.post(() -> callback.onSuccess("¡Conexión exitosa con Firebase!"));
+            else mainHandler.post(() -> callback.onError("Fallo de conexión: " + task.getException().getMessage()));
+        });
+    }
+
+    public static void postScore(String name, int points, long time, ScoreCallback callback) {
+        postHighScore(name, points, callback);
+        if (time > 0) postBossRun(name, time, points, callback);
+    }
+
+    public static class ScoreEntry {
+        public String name;
+        public int points;
+        public long timestamp;
+        public ScoreEntry() {}
+        public ScoreEntry(String name, int points, long timestamp) {
+            this.name = name; this.points = points; this.timestamp = timestamp;
+        }
+    }
+
+    public static class BossRunEntry {
+        public String name;
+        public long time;
+        public int points;
+        public long timestamp;
+        public BossRunEntry() {}
+        public BossRunEntry(String name, long time, int points, long timestamp) {
+            this.name = name; this.time = time; this.points = points; this.timestamp = timestamp;
+        }
+    }
 
     public interface ScoreCallback {
         void onSuccess(String result);
         void onError(String error);
-    }
-
-    public static void postScore(String name, int points, long time, ScoreCallback callback) {
-        try {
-            JSONObject json = new JSONObject();
-            json.put("dataSource", CLUSTER);
-            json.put("database", DATABASE);
-            json.put("collection", COLLECTION);
-            
-            JSONObject doc = new JSONObject();
-            doc.put("name", name);
-            doc.put("points", points);
-            doc.put("time", time);
-            doc.put("timestamp", System.currentTimeMillis());
-            
-            json.put("document", doc);
-
-            RequestBody body = RequestBody.create(json.toString(), JSON);
-            Request request = new Request.Builder()
-                    .url(BASE_URL + "insertOne")
-                    .addHeader("api-key", API_KEY)
-                    .post(body)
-                    .build();
-
-            client.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    new Handler(Looper.getMainLooper()).post(() -> callback.onError(e.getMessage()));
-                }
-
-                @Override
-                public void onResponse(Call call, Response response) throws IOException {
-                    new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess("Score Saved!"));
-                }
-            });
-        } catch (Exception e) {
-            callback.onError(e.getMessage());
-        }
-    }
-
-    public static void getTopScores(ScoreCallback callback) {
-        try {
-            JSONObject json = new JSONObject();
-            json.put("dataSource", CLUSTER);
-            json.put("database", DATABASE);
-            json.put("collection", COLLECTION);
-            
-            JSONObject sort = new JSONObject();
-            sort.put("points", -1); // De mayor a menor
-            json.put("sort", sort);
-            json.put("limit", 10);
-
-            RequestBody body = RequestBody.create(json.toString(), JSON);
-            Request request = new Request.Builder()
-                    .url(BASE_URL + "find")
-                    .addHeader("api-key", API_KEY)
-                    .post(body)
-                    .build();
-
-            client.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    new Handler(Looper.getMainLooper()).post(() -> callback.onError(e.getMessage()));
-                }
-
-                @Override
-                public void onResponse(Call call, Response response) throws IOException {
-                    try {
-                        String bodyStr = response.body().string();
-                        JSONObject res = new JSONObject(bodyStr);
-                        JSONArray docs = res.getJSONArray("documents");
-                        StringBuilder sb = new StringBuilder("🏆 GLOBAL TOP 10 🏆\n\n");
-                        for (int i = 0; i < docs.length(); i++) {
-                            JSONObject d = docs.getJSONObject(i);
-                            sb.append(String.format("%d. %s - %d pts (%ds)\n", 
-                                i + 1, d.getString("name"), d.getInt("points"), d.getLong("time")/1000));
-                        }
-                        new Handler(Looper.getMainLooper()).post(() -> callback.onSuccess(sb.toString()));
-                    } catch (Exception e) {
-                        new Handler(Looper.getMainLooper()).post(() -> callback.onError("Empty scoreboard"));
-                    }
-                }
-            });
-        } catch (Exception e) {
-            callback.onError(e.getMessage());
-        }
     }
 }

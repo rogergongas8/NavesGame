@@ -3,6 +3,8 @@ package com.example.navesgame;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.View;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -40,19 +42,45 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        loadGlobalScores();
+        Button btnScoreboard = findViewById(R.id.btnScoreboard);
+        View scrollScoreboard = findViewById(R.id.scrollScoreboard);
+        Button btnCloseScoreboard = findViewById(R.id.btnCloseScoreboard);
+
+        btnScoreboard.setOnClickListener(v -> {
+            scrollScoreboard.setVisibility(View.VISIBLE);
+            loadGlobalScores(); // Cargar al abrir para mostrar datos frescos
+        });
+        
+        btnCloseScoreboard.setOnClickListener(v -> scrollScoreboard.setVisibility(View.GONE));
+
+        // Test silencioso (solo log) para verificar conexión al inicio
+        CloudScoreboard.testConnection(new CloudScoreboard.ScoreCallback() {
+            @Override public void onSuccess(String r) { Log.d("Firebase", r); }
+            @Override public void onError(String er) { Log.e("Firebase", er); }
+        });
     }
 
     private void loadGlobalScores() {
+        txtLeaderboard.setText("Actualizando puntuaciones...");
+        
         CloudScoreboard.getTopScores(new CloudScoreboard.ScoreCallback() {
             @Override
-            public void onSuccess(String result) {
-                txtLeaderboard.setText(result);
+            public void onSuccess(String scoresResult) {
+                CloudScoreboard.getTopBossRuns(new CloudScoreboard.ScoreCallback() {
+                    @Override
+                    public void onSuccess(String runsResult) {
+                        txtLeaderboard.setText(scoresResult + "\n\n" + runsResult);
+                    }
+                    @Override
+                    public void onError(String error) {
+                        txtLeaderboard.setText(scoresResult + "\n\nError Boss Runs: " + error);
+                    }
+                });
             }
 
             @Override
             public void onError(String error) {
-                txtLeaderboard.setText("Global Scoreboard Offline\n\nModo Local Activo.");
+                txtLeaderboard.setText("⚠️ ERROR DE CONEXIÓN ⚠️\n\n" + error);
             }
         });
     }
