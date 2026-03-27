@@ -1,6 +1,8 @@
 package com.example.navesgame;
 
 import android.os.Bundle;
+import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.WindowInsetsController;
@@ -48,6 +50,19 @@ public class GameActivity extends AppCompatActivity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) hideSystemUI();
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        Log.d("KEYBOARD", "dispatchKeyEvent action=" + event.getAction() + " keyCode=" + event.getKeyCode());
+        if (gameView != null) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                if (gameView.onKeyDown(event.getKeyCode(), event)) return true;
+            } else if (event.getAction() == KeyEvent.ACTION_UP) {
+                if (gameView.onKeyUp(event.getKeyCode(), event)) return true;
+            }
+        }
+        return super.dispatchKeyEvent(event);
     }
 
     @Override

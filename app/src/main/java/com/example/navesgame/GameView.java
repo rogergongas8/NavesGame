@@ -59,6 +59,8 @@ public class GameView extends SurfaceView implements Runnable {
     private float lastTouchX, lastTouchY;
     private boolean moveLeft = false, moveRight = false, moveUp = false, moveDown = false;
     private boolean keyShoot = false;
+    private long keyLeftTime = 0, keyRightTime = 0, keyUpTime = 0, keyDownTime = 0, keyShootTime = 0;
+    private static final long KEY_HOLD_MS = 200;
 
     private static final int BULLET_SIZE = 20;
     private static final int ENEMY_BULLET_SIZE = 25;
@@ -177,15 +179,22 @@ public class GameView extends SurfaceView implements Runnable {
     }
 
     private void handleKeyboardMovement() {
+        long now = System.currentTimeMillis();
+
+        // Mantener movimiento activo si la tecla se pulsó recientemente
+        if (moveLeft && now - keyLeftTime > KEY_HOLD_MS) moveLeft = false;
+        if (moveRight && now - keyRightTime > KEY_HOLD_MS) moveRight = false;
+        if (moveUp && now - keyUpTime > KEY_HOLD_MS) moveUp = false;
+        if (moveDown && now - keyDownTime > KEY_HOLD_MS) moveDown = false;
+        if (keyShoot && now - keyShootTime > KEY_HOLD_MS) keyShoot = false;
+
         int speed = gameState.hasSpeedBoost() ? 25 : 15;
-        
-        // Movimiento en ambos ejes para una mejor experiencia de teclado (2D)
+
         if (moveLeft) playerX -= speed;
         if (moveRight) playerX += speed;
         if (moveUp) playerY -= speed;
         if (moveDown) playerY += speed;
-        
-        // Mantener dentro de los límites de la pantalla
+
         if (playerX < 0) playerX = 0;
         if (playerX > screenX - playerSize) playerX = screenX - playerSize;
         if (playerY < 0) playerY = 0;
@@ -596,11 +605,12 @@ public class GameView extends SurfaceView implements Runnable {
             return true;
         }
         if (gameState.getState() == GameState.STATE_PLAYING) {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_A) moveLeft = true;
-            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_D) moveRight = true;
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_W) moveUp = true;
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_S) moveDown = true;
-            if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER) keyShoot = true;
+            long now = System.currentTimeMillis();
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_A) { moveLeft = true; keyLeftTime = now; }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_D) { moveRight = true; keyRightTime = now; }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_W) { moveUp = true; keyUpTime = now; }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_S) { moveDown = true; keyDownTime = now; }
+            if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER) { keyShoot = true; keyShootTime = now; }
             return true;
         } else if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
             if (gameState.getState() == GameState.STATE_MENU) {
