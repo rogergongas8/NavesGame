@@ -86,7 +86,13 @@ public class GameView extends SurfaceView implements Runnable {
         initMenuButtons();
         loadHighScore();
         setFocusable(true);
-        requestFocus();
+        setFocusableInTouchMode(true);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasWindowFocus) {
+        super.onWindowFocusChanged(hasWindowFocus);
+        if (hasWindowFocus) requestFocus();
     }
 
     private void resetPlayerPosition() {
@@ -173,15 +179,11 @@ public class GameView extends SurfaceView implements Runnable {
     private void handleKeyboardMovement() {
         int speed = gameState.hasSpeedBoost() ? 25 : 15;
         
-        if (!isLandscape) {
-            // Modo Vertical: Movimiento horizontal (X)
-            if (moveLeft) playerX -= speed;
-            if (moveRight) playerX += speed;
-        } else {
-            // Modo Horizontal (Landscape): Movimiento vertical (Y)
-            if (moveUp) playerY -= speed;
-            if (moveDown) playerY += speed;
-        }
+        // Movimiento en ambos ejes para una mejor experiencia de teclado (2D)
+        if (moveLeft) playerX -= speed;
+        if (moveRight) playerX += speed;
+        if (moveUp) playerY -= speed;
+        if (moveDown) playerY += speed;
         
         // Mantener dentro de los límites de la pantalla
         if (playerX < 0) playerX = 0;
