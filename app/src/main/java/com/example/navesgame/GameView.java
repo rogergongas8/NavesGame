@@ -172,16 +172,18 @@ public class GameView extends SurfaceView implements Runnable {
 
     private void handleKeyboardMovement() {
         int speed = gameState.hasSpeedBoost() ? 25 : 15;
+        
         if (!isLandscape) {
-            // En VERTICAL: Solo movimiento Horizontal (X)
+            // Modo Vertical: Movimiento horizontal (X)
             if (moveLeft) playerX -= speed;
             if (moveRight) playerX += speed;
         } else {
-            // En HORIZONTAL: Solo movimiento Vertical (Y)
+            // Modo Horizontal (Landscape): Movimiento vertical (Y)
             if (moveUp) playerY -= speed;
             if (moveDown) playerY += speed;
         }
         
+        // Mantener dentro de los límites de la pantalla
         if (playerX < 0) playerX = 0;
         if (playerX > screenX - playerSize) playerX = screenX - playerSize;
         if (playerY < 0) playerY = 0;
@@ -592,23 +594,33 @@ public class GameView extends SurfaceView implements Runnable {
             return true;
         }
         if (gameState.getState() == GameState.STATE_PLAYING) {
-            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) moveLeft = true;
-            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) moveRight = true;
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP) moveUp = true;
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) moveDown = true;
-            if (keyCode == KeyEvent.KEYCODE_SPACE) keyShoot = true;
-        } else if (keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_A) moveLeft = true;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_D) moveRight = true;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_W) moveUp = true;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_S) moveDown = true;
+            if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER) keyShoot = true;
+            return true;
+        } else if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
             if (gameState.getState() == GameState.STATE_MENU) {
-                gameState.setMap(0); gameState.resetForNewGame(); gameState.setState(GameState.STATE_PLAYING);
+                gameState.setMap(0); 
+                gameState.resetForNewGame(); 
+                gameState.setState(GameState.STATE_PLAYING);
                 enemies.clear(); bullets.clear(); powerUps.clear();
-            } else if (gameState.getState() == GameState.STATE_GAME_OVER) gameState.setState(GameState.STATE_MENU);
+            } else if (gameState.getState() == GameState.STATE_GAME_OVER) {
+                gameState.setState(GameState.STATE_MENU);
+            }
+            return true;
         }
-        return true;
+        return super.onKeyDown(keyCode, event);
     }
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        moveLeft = moveRight = moveUp = moveDown = keyShoot = false;
+        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_A) moveLeft = false;
+        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_D) moveRight = false;
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_W) moveUp = false;
+        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_S) moveDown = false;
+        if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER) keyShoot = false;
         return true;
     }
 

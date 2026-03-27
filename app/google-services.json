@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "445005905309",
+    "firebase_url": "https://navesgame-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "navesgame",
+    "storage_bucket": "navesgame.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:445005905309:android:a12f9596c34e10ce904374",
+        "android_client_info": {
+          "package_name": "com.example.navesgame"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBqkvBAtHgzdEgoSwQqiFxySy7VZbrdSAI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -9,7 +9,9 @@
       "Read(//c/Program Files \\(x86\\)/**)",
       "Bash(cmd.exe /c \"C:\\\\Users\\\\rogergongas\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\GitHub.cli_Microsoft.Winget.Source_8wekyb3d8bbwe\\\\gh_2.88.0_x64\\\\gh.exe auth status\" 2>&1)",
       "Bash(powershell.exe -Command \"gh auth status\" 2>&1)",
-      "Bash(cd \"C:\\\\Users\\\\rogergongas\\\\StudioProjects\\\\NavesGame\" && ./gradlew assembleDebug 2>&1)"
+      "Bash(cd \"C:\\\\Users\\\\rogergongas\\\\StudioProjects\\\\NavesGame\" && ./gradlew assembleDebug 2>&1)",
+      "Bash(ls -la /Users/rogergongas/Developer/NavesGame/app/build.gradle*)",
+      "Bash(ls:*)"
     ]
   }
 }
