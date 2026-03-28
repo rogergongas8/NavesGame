@@ -10,9 +10,9 @@ public class Particle {
     private static final Random random = new Random();
 
     public Particle(float x, float y, int color) {
-        this(x, y, color, 0, 0);
-        float angle = (float)(random.nextFloat() * 2 * Math.PI);
-        float speed = random.nextFloat() * 10 + 2;
+        this(x, y, color, 0f, 0f);
+        float angle = (float)(random.nextFloat() * 2f * Math.PI);
+        float speed = (float)(random.nextFloat() * 10f + 2f);
         this.vx = (float)(Math.cos(angle) * speed);
         this.vy = (float)(Math.sin(angle) * speed);
     }
@@ -24,10 +24,14 @@ public class Particle {
         this.size = random.nextInt(10) + 5;
     }
 
-    public void update() {
-        x += vx; y += vy; 
-        if (vx != 0 || vy != 0) { vx *= 0.95f; vy *= 0.95f; } // Fricción para estelas
-        alpha -= 10;
+    public void update(float deltaTime) {
+        float speedScale = deltaTime * 60f;
+        x += vx * speedScale; y += vy * speedScale; 
+        if (vx != 0 || vy != 0) { 
+            vx *= (float)Math.pow(0.95, speedScale); 
+            vy *= (float)Math.pow(0.95, speedScale); 
+        } // Fricción para estelas
+        alpha -= 600 * deltaTime; // Desvanece en ~0.4s
         if (alpha <= 0) active = false;
     }
 
@@ -39,7 +43,7 @@ public class Particle {
         return Color.argb((int)alpha, Color.red(color), Color.green(color), Color.blue(color));
     }
 
-    public static Particle[] createEnemyExplosion(int x, int y, int color) {
+    public static Particle[] createEnemyExplosion(float x, float y, int color) {
         Particle[] p = new Particle[15];
         for (int i = 0; i < 15; i++) p[i] = new Particle(x, y, color);
         return p;

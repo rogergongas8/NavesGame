@@ -24,7 +24,8 @@ public class Enemigo {
         {0,0,1,0,0,1,0,0,1,0,0}
     };
 
-    public int x, y, velocidad, tipo, color, hp, maxHp;
+    public float x, y;
+    public int velocidad, tipo, color, hp, maxHp;
     public boolean isBoss = false;
     public int bossType = 0;
     public long bossTime = 0;
@@ -81,37 +82,39 @@ public class Enemigo {
         this.maxHp = this.hp;
     }
 
-    public void updateOriented(int screenX, int screenY, boolean isLandscape) {
+    public void updateOriented(int screenX, int screenY, boolean isLandscape, float deltaTime) {
+        float speedScale = velocidad * deltaTime * 60f; // Escalar velocidad base a segundos
         if (!isBoss) {
             if (isLandscape) {
-                x += velocidad;
+                x += speedScale;
                 if (tipo == TYPE_ZIGZAG) {
-                    sinTime += 0.15f;
-                    y += (int)(Math.sin(sinTime) * 12);
+                    sinTime += 9f * deltaTime;
+                    y += (float)(Math.sin(sinTime) * 12);
                 }
             } else {
-                y += velocidad;
+                y += speedScale;
                 if (tipo == TYPE_ZIGZAG) {
-                    sinTime += 0.15f;
-                    x += (int)(Math.sin(sinTime) * 12);
+                    sinTime += 9f * deltaTime;
+                    x += (float)(Math.sin(sinTime) * 12);
                 }
             }
         } else {
             // IA del Boss Adaptativa
+            float bossSpeed = speedScale;
             if (isLandscape) {
                 if (bossType == 3) {
-                    if (x < 200) x += velocidad; // Boss final se queda al principio
+                    if (x < 200) x += bossSpeed; // Boss final se queda al principio
                 } else {
-                    if (x < 300) x += velocidad;
-                    y += direction * 8;
+                    if (x < 300) x += bossSpeed;
+                    y += direction * 8 * deltaTime * 60f;
                     if (y < 50 || y > screenY - 250) direction *= -1;
                 }
             } else {
                 if (bossType == 3) {
-                    if (y < 150) y += velocidad; // Boss final se queda arriba
+                    if (y < 150) y += bossSpeed; // Boss final se queda arriba
                 } else {
-                    if (y < 200) y += velocidad;
-                    x += direction * 8;
+                    if (y < 200) y += bossSpeed;
+                    x += direction * 8 * deltaTime * 60f;
                     if (x < 50 || x > screenX - 350) direction *= -1;
                 }
             }

@@ -9,8 +9,10 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
-import android.media.ToneGenerator;
+import android.media.SoundPool;
+import android.os.Build;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
@@ -30,7 +32,8 @@ public class GameView extends SurfaceView implements Runnable {
     private int screenX, screenY;
     private Paint paint;
     private SurfaceHolder surfaceHolder;
-    private ToneGenerator toneGenerator;
+    private SoundPool soundPool;
+    private int sfxLaser1, sfxLaser2, sfxLose, sfxShieldDown, sfxShieldUp, sfxZap;
     private Random random = new Random();
 
     private boolean isLandscape = false;
@@ -40,7 +43,8 @@ public class GameView extends SurfaceView implements Runnable {
     private RectF[] diffButtons = new RectF[3];
     private String[] diffNames = {"FÁCIL", "NORMAL", "DIFÍCIL"};
 
-    private int playerX, playerY, playerSize = 80;
+    private float playerX, playerY;
+    private int playerSize = 80;
     private List<Bullet> bullets = new ArrayList<>();
     private List<Bullet> enemyBullets = new ArrayList<>();
     private List<Enemigo> enemies = new ArrayList<>();
@@ -51,16 +55,16 @@ public class GameView extends SurfaceView implements Runnable {
     private long lastTime;
     private static final int FPS = 60;
     private static final long TIME_PER_FRAME = 1000000000 / FPS;
+    private float deltaTime = 0;
 
     private int screenShakeFrames = 0, combo = 0;
     private long gameTime = 0, lastShotTime = 0, lastKillTime = 0;
     
-    private boolean isTouching = false;
+    private volatile boolean isTouching = false, isShooting = false;
+    private volatile boolean keyL = false, keyR = false, keyU = false, keyD = false;
+    private long lastTimeL, lastTimeR, lastTimeU, lastTimeD;
     private float lastTouchX, lastTouchY;
-    private boolean moveLeft = false, moveRight = false, moveUp = false, moveDown = false;
-    private boolean keyShoot = false;
-    private long keyLeftTime = 0, keyRightTime = 0, keyUpTime = 0, keyDownTime = 0, keyShootTime = 0;
-    private static final long KEY_HOLD_MS = 200;
+
 
     private static final int BULLET_SIZE = 20;
     private static final int ENEMY_BULLET_SIZE = 25;
@@ -79,7 +83,8 @@ public class GameView extends SurfaceView implements Runnable {
         this.paint.setTypeface(Typeface.MONOSPACE);
         this.gameState = new GameState();
         this.gameState.setPlayerName(playerName);
-        try { toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 100); } catch (Exception e) {}
+        
+        initSoundPool(context);
         
         stars = new Star[100];
         for (int i = 0; i < 100; i++) stars[i] = new Star(screenX, screenY);
@@ -91,10 +96,27 @@ public class GameView extends SurfaceView implements Runnable {
         setFocusableInTouchMode(true);
     }
 
+    private void initSoundPool(Context context) {
+        AudioAttributes attrs = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_GAME)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build();
+        soundPool = new SoundPool.Builder()
+                .setMaxStreams(10)
+                .setAudioAttributes(attrs)
+                .build();
+
+        sfxLaser1 = soundPool.load(context, R.raw.sfx_laser1, 1);
+        sfxLaser2 = soundPool.load(context, R.raw.sfx_laser2, 1);
+        sfxLose = soundPool.load(context, R.raw.sfx_lose, 1);
+        sfxShieldDown = soundPool.load(context, R.raw.sfx_shielddown, 1);
+        sfxShieldUp = soundPool.load(context, R.raw.sfx_shieldup, 1);
+        sfxZap = soundPool.load(context, R.raw.sfx_zap, 1);
+    }
+
     @Override
     public void onWindowFocusChanged(boolean hasWindowFocus) {
         super.onWindowFocusChanged(hasWindowFocus);
-        if (hasWindowFocus) requestFocus();
     }
 
     private void resetPlayerPosition() {
@@ -133,7 +155,10 @@ public class GameView extends SurfaceView implements Runnable {
         lastTime = System.nanoTime();
         while (isPlaying) {
             long now = System.nanoTime();
-            if (now - lastTime >= TIME_PER_FRAME) {
+            long elapsedNano = now - lastTime;
+            
+            if (elapsedNano >= TIME_PER_FRAME) {
+                deltaTime = elapsedNano / 1000000000f; // Segundos transcurridos
                 update();
                 drawFrame();
                 lastTime = now;
@@ -158,13 +183,13 @@ public class GameView extends SurfaceView implements Runnable {
 
         if (gameState.getState() == GameState.STATE_PLAYING) {
             if (!isPaused) {
-                handleKeyboardMovement();
+                handleManualRepeatMovement();
                 updateGame();
-                if (isTouching || keyShoot) shoot();
+                if (isTouching || isShooting) shoot();
             }
-        }
+        }   
         for (int i = particles.size() - 1; i >= 0; i--) {
-            particles.get(i).update();
+            particles.get(i).update(deltaTime);
             if (!particles.get(i).isActive()) particles.remove(i);
         }
         
@@ -178,23 +203,20 @@ public class GameView extends SurfaceView implements Runnable {
         gameTime += 16;
     }
 
-    private void handleKeyboardMovement() {
+    private void handleManualRepeatMovement() {
         long now = System.currentTimeMillis();
-
-        // Mantener movimiento activo si la tecla se pulsó recientemente
-        if (moveLeft && now - keyLeftTime > KEY_HOLD_MS) moveLeft = false;
-        if (moveRight && now - keyRightTime > KEY_HOLD_MS) moveRight = false;
-        if (moveUp && now - keyUpTime > KEY_HOLD_MS) moveUp = false;
-        if (moveDown && now - keyDownTime > KEY_HOLD_MS) moveDown = false;
-        if (keyShoot && now - keyShootTime > KEY_HOLD_MS) keyShoot = false;
-
-        int speed = gameState.hasSpeedBoost() ? 25 : 15;
-
-        if (moveLeft) playerX -= speed;
-        if (moveRight) playerX += speed;
-        if (moveUp) playerY -= speed;
-        if (moveDown) playerY += speed;
-
+        long interval = 80; // Bajado de 100 a 80ms para eliminar el "parón" percibido
+        float jump = 60f;
+        
+        if (isLandscape) {
+            if (keyU && now - lastTimeU > interval) { playerY -= jump; lastTimeU = now; }
+            if (keyD && now - lastTimeD > interval) { playerY += jump; lastTimeD = now; }
+        } else {
+            if (keyL && now - lastTimeL > interval) { playerX -= jump; lastTimeL = now; }
+            if (keyR && now - lastTimeR > interval) { playerX += jump; lastTimeR = now; }
+        }
+        
+        // Limites
         if (playerX < 0) playerX = 0;
         if (playerX > screenX - playerSize) playerX = screenX - playerSize;
         if (playerY < 0) playerY = 0;
@@ -222,14 +244,14 @@ public class GameView extends SurfaceView implements Runnable {
 
         for (int i = bullets.size()-1; i>=0; i--) {
             Bullet b = bullets.get(i);
-            b.x += b.vx; b.y += b.vy;
+            b.x += b.vx * deltaTime * 60f; b.y += b.vy * deltaTime * 60f;
             if (b.x < -100 || b.y < -100 || b.x > screenX + 100 || b.y > screenY + 100) bullets.remove(i);
         }
 
         for (int i = enemyBullets.size()-1; i>=0; i--) {
             Bullet b = enemyBullets.get(i);
-            b.x += b.vx; b.y += b.vy;
-            if (checkCollision((int)b.x, (int)b.y, ENEMY_BULLET_SIZE, ENEMY_BULLET_SIZE, playerX, playerY, playerSize, playerSize)) {
+            b.x += b.vx * deltaTime * 60f; b.y += b.vy * deltaTime * 60f;
+            if (checkCollision(b.x, b.y, ENEMY_BULLET_SIZE, ENEMY_BULLET_SIZE, playerX, playerY, playerSize, playerSize)) {
                 if (gameState.hasShield()) { gameState.useShield(); enemyBullets.remove(i); screenShakeFrames = 15; }
                 else { 
                     gameState.takeDamage();
@@ -243,7 +265,7 @@ public class GameView extends SurfaceView implements Runnable {
 
         for (int i = enemies.size()-1; i>=0; i--) {
             Enemigo e = enemies.get(i);
-            e.updateOriented(screenX, screenY, isLandscape);
+            e.updateOriented(screenX, screenY, isLandscape, deltaTime);
             
             // Patrón de Ataque Avanzado del Boss
             if (e.isBoss) {
@@ -341,7 +363,7 @@ public class GameView extends SurfaceView implements Runnable {
                             enemies.remove(i); 
                         }
                         else { combo++; lastKillTime = now; gameState.addScore(20 + combo*4); enemies.remove(i); }
-                        playSound(ToneGenerator.TONE_PROP_BEEP2, 50);
+                        playSfx(sfxShieldUp);
                         break;
                     }
                 }
@@ -357,10 +379,10 @@ public class GameView extends SurfaceView implements Runnable {
         }
 
         for (int i = powerUps.size()-1; i>=0; i--) {
-            PowerUp p = powerUps.get(i); p.update();
+            PowerUp p = powerUps.get(i); p.update(deltaTime);
             if (checkCollision(p.getX(), p.getY(), POWERUP_SIZE, POWERUP_SIZE, playerX, playerY, playerSize, playerSize)) {
                 p.applyEffect(gameState, this); powerUps.remove(i);
-                playSound(ToneGenerator.TONE_PROP_BEEP, 100);
+                playSfx(sfxShieldDown);
             } else if (p.isOffScreen(screenX, screenY)) powerUps.remove(i);
         }
         if (now - lastKillTime > 1500) combo = 0;
@@ -369,8 +391,8 @@ public class GameView extends SurfaceView implements Runnable {
     private void shoot() {
         long now = System.currentTimeMillis();
         if (now - lastShotTime > 140) {
-            int mx = playerX + playerSize/2 - 10;
-            int my = playerY + playerSize/2 - 10;
+            float mx = playerX + playerSize/2f - 10;
+            float my = playerY + playerSize/2f - 10;
             float vx = isLandscape ? -40 : 0;
             float vy = isLandscape ? 0 : -40;
 
@@ -383,7 +405,8 @@ public class GameView extends SurfaceView implements Runnable {
                 bullets.add(new Bullet(isLandscape ? playerX + 25 : mx + 35, isLandscape ? my + 35 : playerY + 25, vx, vy));
                 bullets.add(new Bullet(isLandscape ? playerX - 25 : mx, isLandscape ? my : playerY - 35, vx, vy));
             }
-            lastShotTime = now; playSound(ToneGenerator.TONE_PROP_BEEP, 40);
+            lastShotTime = now; 
+            playSfx(random.nextBoolean() ? sfxLaser1 : sfxLaser2);
         }
     }
 
@@ -406,7 +429,7 @@ public class GameView extends SurfaceView implements Runnable {
             }
             
             canvas.save();
-            if (isLandscape) canvas.rotate(-90, playerX + playerSize/2, playerY + playerSize/2); // Apuntar a la IZQUIERDA
+            if (isLandscape) canvas.rotate(-90, playerX + playerSize/2f, playerY + playerSize/2f); // Apuntar a la IZQUIERDA
             drawPixelSprite(canvas, playerX, playerY, 12, Color.CYAN, Color.WHITE, SPRITE_PLAYER);
             canvas.restore();
             
@@ -504,7 +527,7 @@ public class GameView extends SurfaceView implements Runnable {
         canvas.restore();
     }
 
-    private void drawPixelSprite(Canvas canvas, int x, int y, int ps, int c1, int c2, int[][] s) {
+    private void drawPixelSprite(Canvas canvas, float x, float y, int ps, int c1, int c2, int[][] s) {
         for (int r=0; r<s.length; r++) for (int c=0; c<s[r].length; c++) {
             if (s[r][c] == 0) continue; paint.setColor(s[r][c] == 1 ? c1 : c2);
             canvas.drawRect(x+c*ps, y+r*ps, x+(c+1)*ps, y+(r+1)*ps, paint);
@@ -523,9 +546,10 @@ public class GameView extends SurfaceView implements Runnable {
         } else canvas.drawColor(Color.BLACK);
 
         paint.setColor(Color.WHITE);
+        float starMove = (gameState.hasSlowMotion() ? 100f : 200f) * deltaTime;
         for (Star s : stars) {
-            if (isLandscape) { s.x += s.speed; if (s.x > screenX) s.x = 0; } // Estrellas hacia la DERECHA
-            else { s.y += s.speed; if (s.y > screenY) s.y = 0; }
+            if (isLandscape) { s.x += s.speed * deltaTime * 2f; if (s.x > screenX) s.x = 0; } // Estrellas hacia la DERECHA
+            else { s.y += s.speed * deltaTime * 2f; if (s.y > screenY) s.y = 0; }
             paint.setAlpha(random.nextInt(150)+105);
             canvas.drawRect(s.x, s.y, s.x+5, s.y+5, paint);
         }
@@ -551,9 +575,20 @@ public class GameView extends SurfaceView implements Runnable {
         });
     }
     private void sleep() { try { Thread.sleep(1); } catch (Exception e) {} }
-    private void playSound(int t, int d) { if (toneGenerator != null) toneGenerator.startTone(t, d); }
-    public void resume() { isPlaying = true; thread = new Thread(this); thread.start(); }
-    public void pause() { isPlaying = false; try { thread.join(); } catch (Exception e) {} }
+    private void playSfx(int soundID) {
+        if (soundPool != null && soundID != 0) {
+            soundPool.play(soundID, 0.7f, 0.7f, 0, 0, 1.0f);
+        }
+    }
+    public void resume() { isPlaying = true; if(soundPool!=null) soundPool.autoResume(); thread = new Thread(this); thread.start(); }
+    public void pause() { isPlaying = false; if(soundPool!=null) soundPool.autoPause(); try { thread.join(); } catch (Exception e) {} }
+    
+    public void releaseResources() {
+        if (soundPool != null) {
+            soundPool.release();
+            soundPool = null;
+        }
+    }
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
@@ -606,11 +641,21 @@ public class GameView extends SurfaceView implements Runnable {
         }
         if (gameState.getState() == GameState.STATE_PLAYING) {
             long now = System.currentTimeMillis();
-            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_A) { moveLeft = true; keyLeftTime = now; }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_D) { moveRight = true; keyRightTime = now; }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_W) { moveUp = true; keyUpTime = now; }
-            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_S) { moveDown = true; keyDownTime = now; }
-            if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER) { keyShoot = true; keyShootTime = now; }
+            float jumpSize = 60f;
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_A) { 
+                if (!keyL) { if(!isLandscape) playerX -= jumpSize; lastTimeL = now; } keyL = true; 
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_D) { 
+                if (!keyR) { if(!isLandscape) playerX += jumpSize; lastTimeR = now; } keyR = true; 
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_W) { 
+                if (!keyU) { if(isLandscape) playerY -= jumpSize; lastTimeU = now; } keyU = true; 
+            }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_S) { 
+                if (!keyD) { if(isLandscape) playerY += jumpSize; lastTimeD = now; } keyD = true; 
+            }
+
+            if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER) isShooting = true;
             return true;
         } else if (keyCode == KeyEvent.KEYCODE_ENTER || keyCode == KeyEvent.KEYCODE_DPAD_CENTER) {
             if (gameState.getState() == GameState.STATE_MENU) {
@@ -628,15 +673,17 @@ public class GameView extends SurfaceView implements Runnable {
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_A) moveLeft = false;
-        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_D) moveRight = false;
-        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_W) moveUp = false;
-        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_S) moveDown = false;
-        if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER) keyShoot = false;
+        if (keyCode == KeyEvent.KEYCODE_SPACE || keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (event.getEventTime() - event.getDownTime() > 20) isShooting = false;
+        }
+        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_A) keyL = false;
+        if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT || keyCode == KeyEvent.KEYCODE_D) keyR = false;
+        if (keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_W) keyU = false;
+        if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_S) keyD = false;
         return true;
     }
 
-    private boolean checkCollision(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
+    private boolean checkCollision(float x1, float y1, float w1, float h1, float x2, float y2, float w2, float h2) {
         return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
     }
 
@@ -662,7 +709,7 @@ public class GameView extends SurfaceView implements Runnable {
         }
         enemyBullets.clear();
         gameState.setLastBossScore(gameState.getScore()); // Asegurar gap tras bomba
-        playSound(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 500);
+        playSfx(sfxZap);
     }
 
     private static class Bullet { 

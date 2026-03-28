@@ -14,34 +14,35 @@ public class PowerUp {
 
     public static final int POWER_UP_SIZE = 50;
 
-    private int x, y, type, speed = 4;
+    private float x, y, speed = 240f; // píxeles por segundo
+    private int type;
     private boolean isLandscape = false;
     private Random random = new Random();
 
     public PowerUp(int screenWidth, int screenHeight, boolean isLandscape) {
         this.isLandscape = isLandscape;
         if (isLandscape) {
-            this.x = -50;
-            this.y = random.nextInt(Math.max(1, screenHeight - POWER_UP_SIZE));
+            this.x = -POWER_UP_SIZE;
+            this.y = random.nextFloat() * Math.max(1, screenHeight - POWER_UP_SIZE);
         } else {
-            this.x = random.nextInt(Math.max(1, screenWidth - POWER_UP_SIZE));
-            this.y = -50;
+            this.x = random.nextFloat() * Math.max(1, screenWidth - POWER_UP_SIZE);
+            this.y = -POWER_UP_SIZE;
         }
         this.type = random.nextInt(7);
     }
 
-    public void update() { 
-        if (isLandscape) x += speed;
-        else y += speed; 
+    public void update(float deltaTime) { 
+        if (isLandscape) x += speed * deltaTime;
+        else y += speed * deltaTime; 
     }
     public boolean isOffScreen(int screenWidth, int screenHeight) { 
         if (isLandscape) return x > screenWidth;
         return y > screenHeight; 
     }
-    public int getX() { return x; }
-    public int getY() { return y; }
-    public void setX(int x) { this.x = x; }
-    public void setY(int y) { this.y = y; }
+    public float getX() { return x; }
+    public float getY() { return y; }
+    public void setX(float x) { this.x = x; }
+    public void setY(float y) { this.y = y; }
     public int getType() { return type; }
     public int getColor() {
         switch (type) {
